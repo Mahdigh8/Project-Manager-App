@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     ## Third-party Packages
     "rest_framework",
     "rest_framework.authtoken",
+    "drf_spectacular",
     ## Apps
     "core",
     "user",
@@ -128,5 +129,15 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
 AUTH_USER_MODEL = "core.CustomUser"
+
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Project Manager Tool",
+    "DESCRIPTION": "A simple project manager tool written in Django",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+}
