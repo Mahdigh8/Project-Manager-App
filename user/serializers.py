@@ -4,7 +4,9 @@ from django.contrib.auth import authenticate
 from django.utils.translation import gettext_lazy as _
 
 
-class UserSerializer(serializers.ModelSerializer):
+class CreateUserSerializer(serializers.ModelSerializer):
+    """Serializer for creating new user"""
+
     class Meta:
         model = get_user_model()
         fields = ["username", "email", "password"]
@@ -12,6 +14,18 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return get_user_model().objects.create_user(**validated_data)
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """Serializer for retrieve and update user instances"""
+
+    class Meta:
+        model = get_user_model()
+        fields = ["username", "email", "first_name", "last_name", "date_joined"]
+        extra_kwargs = {
+            "email": {"read_only": True},
+            "date_joined": {"read_only": True},
+        }
 
 
 class AuthTokenSerializer(serializers.Serializer):
