@@ -7,22 +7,22 @@ from user.serializers import UserSerializer
 
 
 USER_PROFILE_URL = reverse("user:profile")
+CHANGE_PASSWORD_URL = reverse("user:password-change")
 
 
 def create_user(**params):
-    payload = {
-        "email": "test@example.com",
-        "username": "testuser1",
-        "password": "Test@user123",
-    }
-    payload.update(**params)
-    return get_user_model().objects.create_user(**payload)
+    return get_user_model().objects.create_user(**params)
 
 
 class PrivateUserAPITests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user = create_user()
+        self.user_payload = {
+            "email": "test@example.com",
+            "username": "testuser1",
+            "password": "Test@user123",
+        }
+        self.user = create_user(**self.user_payload)
         self.client.force_authenticate(user=self.user)
 
     def test_retrieve_profile_success(self):
@@ -50,3 +50,27 @@ class PrivateUserAPITests(TestCase):
         self.assertEqual(self.user.username, payload["username"])
         self.assertEqual(self.user.first_name, payload["first_name"])
         self.assertEqual(self.user.last_name, payload["last_name"])
+
+    def test_change_password_successful(self):
+        """Test change password successful"""
+        payload = {
+            "old_password": self.user_payload["password"],
+            "new_password1": "NewPass123",
+            "new_password2": "NewPass123",
+        }
+        res = self.client.post(CHANGE_PASSWORD_URL, payload)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(payload["new_password1"]))
+
+    def test_change_password_with_invalid_old_password(self):
+        """Test change password with invalid old password"""
+        payload = {
+            "old_password": "invalid_old_password",
+            "new_password1": "NewPass123",
+            "new_password2": "NewPass123",
+        }
+        res = self.client.post(CHANGE_PASSWORD_URL, payload)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.check_password(payload["new_password1"]))
