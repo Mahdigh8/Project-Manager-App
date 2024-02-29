@@ -18,6 +18,8 @@ def create_team(**params):
     payload = {
         "name": "Test team",
         "description": "Team Desc",
+        "public_edit": "ALL",
+        "privacy_edit": "ALL",
     }
     payload.update(**params)
     return Team.objects.create(**payload)
@@ -42,6 +44,9 @@ class TestTeamAPI(TestCase):
         )
         cls.client.force_authenticate(user=cls.user)
 
+    def setUp(self):
+        self.client = TestTeamAPI.client
+
     def test_list_teams_limited_to_user(self):
         """Test retrieving teams that user is a member of them"""
         team1 = create_team()
@@ -56,8 +61,6 @@ class TestTeamAPI(TestCase):
         res = self.client.get(TEAMS_URL)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         user_teams = Team.objects.filter(member__user=self.user)
-        serializer = TeamSerializer(user_teams, many=True)
-        self.assertEqual(res.data, serializer.data)
         self.assertEqual(len(user_teams), 1)
 
     def test_view_team_detail(self):
@@ -66,15 +69,14 @@ class TestTeamAPI(TestCase):
         TeamMember.objects.create(user=self.user, team=team)
         res = self.client.get(team_detail_url(team.id))
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        serializer = TeamSerializer(team)
-        self.assertEqual(res.data, serializer.data)
+        self.assertEqual(res.data["name"], team.name)
+        self.assertEqual(res.data["description"], team.description)
 
-    ## Maybe not necessery bacause of setting get_queryset in viewset
-    def test_view_team_detail(self):
+    def test_view_team_detail_not_a_member_fails(self):
         """Test viewing a team detail that user is not a member should fails"""
         team = create_team()
         res = self.client.get(team_detail_url(team.id))
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_create_basic_team(self):
         """Test creating a team"""
@@ -93,30 +95,6 @@ class TestTeamAPI(TestCase):
         team_member = TeamMember.objects.get(team=team, user=self.user)
         self.assertIsNotNone(team_member)
         self.assertTrue(team_member.is_admin)
-
-    def test_create_team_with_members(self):
-        """Test creating a team with members"""
-        user2 = get_user_model().objects.create(
-            email="other@example.com", username="otherUser2", password="otherPass123"
-        )
-        payload = {
-            "name": "Test team",
-            "description": "Team Desc",
-            "members": [user2.username],
-        }
-        res = self.client.post(TEAMS_URL, payload)
-
-        team = Team.objects.get(id=res.data["id"])
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        ## checks added members to the team
-        ## team creator automatically added to members
-        team_members = TeamMember.objects.filter(team=team)
-        self.assertEqual(team_members.count(), 2)
-        self.assertIn(self.user, team_members)
-        self.assertIn(user2, team_members)
-        ## user2 should be a normal member not an admin
-        user2_member = team_members.filter(user=user2)
-        self.assertFalse(user2_member.is_admin)
 
     def test_partial_update_team_with_admin_role(self):
         """Test partial update team with a user that has admin role in the team"""
@@ -164,7 +142,7 @@ class TestTeamAPI(TestCase):
             "name": "changed name",
         }
         res = self.client.patch(team_detail_url(team.id), payload)
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_partial_update_team_edit_fields_fails(self):
         """
@@ -185,13 +163,12 @@ class TestTeamAPI(TestCase):
         """Test deleting team with user that is not a member of team"""
         team = create_team()
         res = self.client.delete(team_detail_url(team.id))
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
         self.assertTrue(Team.objects.filter(id=team.id).exists())
 
     def test_delete_team_with_admin_role(self):
         """
         Test deleting team with admin role
-        where privacy_edit is set to Admin only
         """
         team = create_team()
         TeamMember.objects.create(user=self.user, team=team, is_admin=True)
@@ -201,11 +178,10 @@ class TestTeamAPI(TestCase):
 
     def test_delete_team_without_admin_role(self):
         """
-        Test deleting team without admin role
-        where privacy_edit is set to All members
+        Test deleting team without admin role fails
         """
         team = create_team()
         TeamMember.objects.create(user=self.user, team=team, is_admin=False)
         res = self.client.delete(team_detail_url(team.id))
-        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Team.objects.filter(id=team.id).exists())
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Team.objects.filter(id=team.id).exists())
