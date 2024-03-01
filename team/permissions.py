@@ -36,20 +36,18 @@ class IsAllowedToDelete(permissions.BasePermission):
         return False
 
 
-# class IsAllowedToInviteMembers(permissions.BasePermission):
-#     """
-#     Object-level permission to only allow inviting members to team
-#     if the user is team admin or privacy_edit is set to ALL.
-#     """
+class IsAllowedToEditMembers(permissions.BasePermission):
+    """
+    Object-level permission to only allow
+    team admins to add, update or delete members
+    """
 
-#     def has_object_permission(self, request, view, obj):
-#         if request.method not in ["PATCH", "PUT"]:
-#             return True
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
 
-#         member = obj.member.get(user=request.user)
-#         if member.is_admin:
-#             return True
-#         elif obj.public_edit == "ALL":
-#             return True
+        member = obj.member.get(user=request.user)
+        if member.is_admin:
+            return True
 
-#         return False
+        return False
