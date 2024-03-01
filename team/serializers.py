@@ -3,16 +3,45 @@ from core.models import Team, TeamMember
 from django.contrib.auth import get_user_model
 
 
+class TeamMemberListSerializer(serializers.ListSerializer):
+    """Serializer for creating and updating multiple team members"""
+
+    def create(self, validated_data):
+        team = validated_data[0].pop("team", None)
+        if team == None:
+            raise serializers.ValidationError(
+                "Team object should be specified for adding members"
+            )
+
+        team_members = []
+        for item in validated_data:
+            email = item.pop("user").get("email")
+            try:
+                user = get_user_model().objects.get(email=email)
+                ## check for duplication of member in the team
+                ## if member is not in the team then add it.
+                if not team.member.filter(user=user).exists():
+                    team_members.append(
+                        TeamMember(team=team, user=user, is_admin=False)
+                    )
+            except:
+                raise serializers.ValidationError(
+                    f"There is no user with email {email}"
+                )
+
+        return TeamMember.objects.bulk_create(team_members)
+
+
 class TeamMemberSerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(
-        queryset=get_user_model().objects.all(),
-        slug_field="username",
-    )
+    first_name = serializers.CharField(source="user.first_name", required=False)
+    last_name = serializers.CharField(source="user.last_name", required=False)
+    email = serializers.EmailField(source="user.email")
 
     class Meta:
         model = TeamMember
-        fields = ["id", "user", "is_admin"]
-        extra_kwargs = {"is_admin": {"read_only": True}}
+        fields = ["id", "email", "last_name", "first_name", "is_admin"]
+        read_only_fields = ["last_name", "first_name", "is_admin"]
+        list_serializer_class = TeamMemberListSerializer
 
 
 class TeamListSerializer(serializers.Serializer):
