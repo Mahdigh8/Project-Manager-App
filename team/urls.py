@@ -9,4 +9,9 @@ app_name = "team"
 
 urlpatterns = [
     path("", include(router.urls)),
+    path(
+        "<int:pk>/remove/<int:member_id>/",
+        views.TeamViewSet.as_view({"delete": "remove_member"}),
+        name="remove-member",
+    ),
 ]
