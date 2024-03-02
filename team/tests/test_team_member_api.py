@@ -11,6 +11,10 @@ def team_member_url(team_id):
     return reverse("team:team-members", args=[team_id])
 
 
+def team_member_remove_url(team_id, member_id):
+    return reverse("team:remove-member", kwargs={"pk": team_id, "member_id": member_id})
+
+
 def create_team(**params):
     payload = {
         "name": "Test team",
@@ -127,3 +131,72 @@ class TeamMemberAPITests(TestCase):
             team_member_url(self.team.id), payload, content_type="application/json"
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_partial_update_team_members_with_admin_role(self):
+        """
+        Test partial update team members
+        only team admins can update team members role
+        """
+        create_member(user=self.user1, team=self.team, is_admin=True)
+        member2 = create_member(user=self.user2, team=self.team, is_admin=False)
+        payload = json.dumps([{"id": member2.id, "is_admin": True}])
+        res = self.client.patch(
+            team_member_url(self.team.id), payload, content_type="application/json"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        member2.refresh_from_db()
+        self.assertTrue(member2.is_admin)
+
+    def test_partial_update_team_members_without_admin_role(self):
+        """
+        Test partial update team members without admin role fails
+        """
+        create_member(user=self.user1, team=self.team, is_admin=False)
+        member2 = create_member(user=self.user2, team=self.team, is_admin=False)
+        payload = json.dumps([{"id": member2.id, "is_admin": True}])
+        res = self.client.patch(
+            team_member_url(self.team.id), payload, content_type="application/json"
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        member2.refresh_from_db()
+        self.assertFalse(member2.is_admin)
+
+    def test_partial_update_team_member_id_not_exist(self):
+        """
+        Test partial update team members with admin role
+        with an id that does not exist fails
+        """
+        create_member(user=self.user1, team=self.team, is_admin=True)
+        payload = json.dumps([{"id": 85, "is_admin": True}])
+        res = self.client.patch(
+            team_member_url(self.team.id), payload, content_type="application/json"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_delete_team_member_with_admin_role(self):
+        """Test deleting a team member with admin role successful"""
+        create_member(user=self.user1, team=self.team, is_admin=True)
+        member2 = create_member(user=self.user2, team=self.team, is_admin=False)
+        res = self.client.delete(team_member_remove_url(self.team.id, member2.id))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(TeamMember.objects.filter(id=member2.id).exists())
+
+    def test_delete_other_team_members_without_admin_role(self):
+        """Test deleting other team members without admin role fails"""
+        create_member(user=self.user1, team=self.team, is_admin=False)
+        member2 = create_member(user=self.user2, team=self.team, is_admin=False)
+        res = self.client.delete(team_member_remove_url(self.team.id, member2.id))
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(TeamMember.objects.filter(id=member2.id).exists())
+
+    def test_user_leaving_team(self):
+        """
+        Test leaving team successful
+        this is the same endpoint but because the user want
+        to remove himself from the team it should be successful
+        """
+        ## user does not have admin role
+        member = create_member(user=self.user1, team=self.team, is_admin=False)
+        res = self.client.delete(team_member_remove_url(self.team.id, member.id))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(TeamMember.objects.filter(id=member.id).exists())
