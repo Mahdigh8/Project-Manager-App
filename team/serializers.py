@@ -7,6 +7,7 @@ class TeamMemberListSerializer(serializers.ListSerializer):
     """Serializer for creating and updating multiple team members"""
 
     def create(self, validated_data):
+        """Adding multiple member to team"""
         team = validated_data[0].pop("team", None)
         if team == None:
             raise serializers.ValidationError(
@@ -15,11 +16,11 @@ class TeamMemberListSerializer(serializers.ListSerializer):
 
         team_members = []
         for item in validated_data:
-            email = item.pop("user").get("email")
+            email = item.pop("user").get("email", None)
             try:
                 user = get_user_model().objects.get(email=email)
                 ## check for duplication of member in the team
-                ## if member is not in the team then add it.
+                ## if member is not already in the team then add it.
                 if not team.member.filter(user=user).exists():
                     team_members.append(
                         TeamMember(team=team, user=user, is_admin=False)
@@ -31,20 +32,43 @@ class TeamMemberListSerializer(serializers.ListSerializer):
 
         return TeamMember.objects.bulk_create(team_members)
 
+    def update(self, instance, validated_data):
+        """Updating multiple members of the team"""
+        member_mapping = {member.id: member for member in instance}
+        data_mapping = {item["id"]: item for item in validated_data}
+
+        objs = []
+        for member_id, data in data_mapping.items():
+            member = member_mapping.get(member_id, None)
+            if member is None:
+                raise serializers.ValidationError(f"No such member with id {member_id}")
+            else:
+                member.is_admin = data.get("is_admin", False)
+                objs.append(member)
+
+        TeamMember.objects.bulk_update(objs, ["is_admin"])
+        return objs
+
 
 class TeamMemberSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source="user.first_name", required=False)
-    last_name = serializers.CharField(source="user.last_name", required=False)
-    email = serializers.EmailField(source="user.email")
+    first_name = serializers.CharField(
+        source="user.first_name", read_only=True, required=False
+    )
+    last_name = serializers.CharField(
+        source="user.last_name", read_only=True, required=False
+    )
+    email = serializers.EmailField(source="user.email", required=False)
+    id = serializers.IntegerField(required=False)
 
     class Meta:
         model = TeamMember
         fields = ["id", "email", "last_name", "first_name", "is_admin"]
-        read_only_fields = ["last_name", "first_name", "is_admin"]
         list_serializer_class = TeamMemberListSerializer
 
 
 class TeamListSerializer(serializers.Serializer):
+    """Serializer for listing team objects"""
+
     url = serializers.HyperlinkedIdentityField(
         read_only=True, view_name="team:team-detail"
     )
