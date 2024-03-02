@@ -36,10 +36,10 @@ class IsAllowedToDelete(permissions.BasePermission):
         return False
 
 
-class IsAllowedToEditMembers(permissions.BasePermission):
+class IsAllowedToAddOrEditMembers(permissions.BasePermission):
     """
     Object-level permission to only allow
-    team admins to add, update or delete members
+    team admins to add or update members
     """
 
     def has_object_permission(self, request, view, obj):
@@ -51,3 +51,24 @@ class IsAllowedToEditMembers(permissions.BasePermission):
             return True
 
         return False
+
+
+class IsAllowedToRemoveMembers(permissions.BasePermission):
+    """
+    Object-level permission to only allow team admins
+    to remove other members or the user to leave the group
+    """
+
+    def has_object_permission(self, request, view, obj, **kwargs):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        team = kwargs.get("team", None)
+        if not team:
+            return False
+
+        member = team.member.get(user=request.user)
+        if member.is_admin:
+            return True
+
+        return obj.user.id == request.user.id
