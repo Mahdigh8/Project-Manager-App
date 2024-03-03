@@ -48,9 +48,6 @@ class Project(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     team = models.ForeignKey(Team, on_delete=models.CASCADE)
-    ## project should not be deleted when the creator leave the team.
-    ## that's why models.SET_NULL is used
-    created_by = models.ForeignKey(TeamMember, null=True, on_delete=models.SET_NULL)
     deadline = models.DateTimeField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
