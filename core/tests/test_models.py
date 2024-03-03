@@ -1,3 +1,4 @@
+import time
 from django.test import TestCase
 from core import models
 from django.contrib.auth import get_user_model
@@ -61,3 +62,34 @@ class TestTeamMemberModel(TestCase):
         models.TeamMember.objects.create(user=self.user, team=self.team)
         with self.assertRaises(BaseException):
             models.TeamMember.objects.create(user=self.user, team=self.team)
+
+
+class TestProjectModel(TestCase):
+    def setUp(self):
+        team_payload = {
+            "name": "Test team",
+            "public_edit": "ADMIN",
+        }
+        user_payload = {
+            "email": "test@example.com",
+            "username": "testuser1",
+            "password": "Testpass123",
+        }
+        self.team = models.Team.objects.create(**team_payload)
+        user = get_user_model().objects.create_user(**user_payload)
+        self.member = models.TeamMember.objects.create(team=self.team, user=user)
+
+    def test_create_project(self):
+        """Test creating a project object"""
+        payload = {
+            "name": "Test project",
+            "team": self.team,
+            "created_by": self.member,
+            "deadline": time.strftime("%Y-%m-%d %H:%M%z"),
+        }
+        project = models.Project.objects.create(**payload)
+        self.assertEqual(project.name, payload["name"])
+        self.assertEqual(project.description, "")
+        self.assertEqual(project.team, payload["team"])
+        self.assertEqual(project.created_by, payload["created_by"])
+        self.assertEqual(project.deadline, payload["deadline"])
