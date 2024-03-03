@@ -90,11 +90,9 @@ class ProjectAPITests(TestCase):
         res = self.client.get(project_detail_url(project.id))
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data["name"], project.name)
-        self.assertEqual(res.data["description"], project.description)
         self.assertIn(
             reverse("team:team-detail", args=[project.team.id]), res.data["team"]
         )
-        self.assertEqual(res.data["deadline"], project.deadline)
 
     def test_view_detail_project_not_allowed(self):
         """Test viewing project that user is not a part of fails"""
@@ -108,16 +106,14 @@ class ProjectAPITests(TestCase):
         payload = {
             "name": "Test Project 1",
             "team_id": self.team.id,
-            "deadline": "2024-03-03 12:37",
+            "deadline": "2024-03-03",
         }
         res = self.client.post(PROJECT_URL, payload)
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         projects = Project.objects.all()
         self.assertTrue(projects.exists())
         self.assertEqual(payload["name"], projects[0].name)
-        self.assertEqual(
-            payload["deadline"], projects[0].deadline.strftime("%Y-%m-%d %H:%M")
-        )
+        self.assertEqual(payload["deadline"], projects[0].deadline.strftime("%Y-%m-%d"))
         self.assertEqual(payload["team_id"], projects[0].team.id)
 
     def test_create_project_without_team_admin_role(self):

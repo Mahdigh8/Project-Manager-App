@@ -77,7 +77,7 @@ class TestProjectModel(TestCase):
         payload = {
             "name": "Test project",
             "team": self.team,
-            "deadline": time.strftime("%Y-%m-%d %H:%M%z"),
+            "deadline": "2024-04-26",
         }
         project = models.Project.objects.create(**payload)
         self.assertEqual(project.name, payload["name"])
