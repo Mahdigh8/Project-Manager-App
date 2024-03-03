@@ -53,7 +53,3 @@ class ProjectViewSet(ModelViewSet):
         if res:
             return res
         return super().create(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        team_id = self.request.data.get("team_id")
-        serializer.save(team_id=team_id)
