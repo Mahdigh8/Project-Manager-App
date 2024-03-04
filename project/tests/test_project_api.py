@@ -1,11 +1,9 @@
-import time
 from django.test import TestCase
 from rest_framework.test import APIClient
 from django.urls import reverse
 from core.models import Project, Team, TeamMember
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from project.serializers import ProjectListSerializer, ProjectSerializer
 
 
 PROJECT_URL = reverse("project:project-list")
@@ -61,7 +59,6 @@ class ProjectAPITests(TestCase):
     def setUpTestData(cls):
         cls.client = APIClient()
         cls.user1 = create_user(username="testUser1", email="test1@example.com")
-        cls.user2 = create_user(username="testUser2", email="test2@example.com")
         cls.client.force_authenticate(user=cls.user1)
         cls.team = create_team()
 
@@ -138,3 +135,75 @@ class ProjectAPITests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
         projects = Project.objects.all()
         self.assertFalse(projects.exists())
+
+    def test_partial_update_project_with_team_admin_role(self):
+        """Test partial update project with team admin role successful"""
+        create_member(team=self.team, user=self.user1, is_admin=True)
+        project = create_project(
+            name="Project 1", team=self.team, deadline="2024-02-02"
+        )
+        payload = {
+            "name": "Changed name",
+            "deadline": "2024-05-25",
+        }
+
+        res = self.client.patch(project_detail_url(project.id), payload)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        project.refresh_from_db()
+        self.assertEqual(project.name, payload["name"])
+        self.assertEqual(project.deadline.strftime("%Y-%m-%d"), payload["deadline"])
+
+    def test_partial_update_project_without_team_admin_role(self):
+        """Test partial update project without team admin role fails"""
+        create_member(team=self.team, user=self.user1, is_admin=False)
+        project = create_project(
+            name="Project 1", team=self.team, deadline="2024-02-02"
+        )
+        payload = {
+            "name": "Changed name",
+            "deadline": "2024-05-25",
+        }
+
+        res = self.client.patch(project_detail_url(project.id), payload)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        project.refresh_from_db()
+        self.assertNotEqual(project.name, payload["name"])
+        self.assertNotEqual(project.deadline.strftime("%Y-%m-%d"), payload["deadline"])
+
+    def test_partial_update_changing_project_team(self):
+        """
+        Test changing the team that is assigned to the project with team admin role.
+        the user should be admin in the new team too.
+        """
+        team2 = create_team(name="Team 2")
+        create_member(team=self.team, user=self.user1, is_admin=True)
+        create_member(team=team2, user=self.user1, is_admin=True)
+        project = create_project(name="Project 1", team=self.team)
+        payload = {
+            "name": "Changed name",
+            "team_id": team2.id,
+        }
+
+        res = self.client.patch(project_detail_url(project.id), payload)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        project.refresh_from_db()
+        self.assertEqual(project.name, payload["name"])
+        self.assertEqual(project.team.id, payload["team_id"])
+
+    def test_delete_project_with_team_admin_role(self):
+        """Test deleting project with team admin role successful"""
+        create_member(team=self.team, user=self.user1, is_admin=True)
+        project = create_project(name="Project 1", team=self.team)
+        res = self.client.delete(project_detail_url(project.id))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        qs = Project.objects.filter(pk=project.id)
+        self.assertFalse(qs.exists())
+
+    def test_delete_project_without_team_admin_role(self):
+        """Test deleting project without team admin role fails"""
+        create_member(team=self.team, user=self.user1, is_admin=False)
+        project = create_project(name="Project 1", team=self.team)
+        res = self.client.delete(project_detail_url(project.id))
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        qs = Project.objects.filter(pk=project.id)
+        self.assertTrue(qs.exists())
