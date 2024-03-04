@@ -15,7 +15,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     team = serializers.HyperlinkedRelatedField(
         view_name="team:team-detail", read_only=True
     )
-    team_id = serializers.IntegerField(required=False, write_only=True)
+    team_id = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = Project
@@ -28,3 +28,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         validated_data["team"] = team
         project = Project.objects.create(**validated_data)
         return project
+
+    def update(self, instance, validated_data):
+        team_id = validated_data.pop("team_id", None)
+        if team_id:
+            team = Team.objects.get(pk=team_id)
+            validated_data["team"] = team
+        return super().update(instance, validated_data)
