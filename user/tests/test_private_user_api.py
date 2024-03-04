@@ -15,15 +15,19 @@ def create_user(**params):
 
 
 class PrivateUserAPITests(TestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.user_payload = {
+    @classmethod
+    def setUpTestData(cls):
+        cls.client = APIClient()
+        cls.user_payload = {
             "email": "test@example.com",
             "username": "testuser1",
             "password": "Test@user123",
         }
-        self.user = create_user(**self.user_payload)
-        self.client.force_authenticate(user=self.user)
+        cls.user = create_user(**cls.user_payload)
+        cls.client.force_authenticate(user=cls.user)
+
+    def setUp(self):
+        self.client = PrivateUserAPITests.client
 
     def test_retrieve_profile_success(self):
         """Test retrieving user profile"""

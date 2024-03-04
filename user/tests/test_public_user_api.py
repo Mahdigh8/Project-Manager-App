@@ -15,13 +15,7 @@ CHANGE_PASSWORD_URL = reverse("user:password-change")
 
 
 def create_user(**params):
-    payload = {
-        "email": "test@example.com",
-        "username": "testuser1",
-        "password": "Test@user123",
-    }
-    payload.update(**params)
-    return get_user_model().objects.create_user(**payload)
+    return get_user_model().objects.create_user(**params)
 
 
 def get_reset_password_url(body):
@@ -34,15 +28,25 @@ def get_reset_password_url(body):
 
 
 class PublicUserAPITests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.client = APIClient()
+        cls.payload = {
+            "email": "test1@example.com",
+            "username": "testuser1",
+            "password": "Test@user123",
+        }
+        cls.user = create_user(**cls.payload)
+
     def setUp(self):
-        self.client = APIClient()
+        self.client = PublicUserAPITests.client
 
     def test_create_valid_user_success(self):
         """Test creating user with valid credentials"""
         payload = {
-            "email": "test@example.com",
-            "username": "testuser1",
-            "password": "Test@user123",
+            "email": "newuser@example.com",
+            "username": "new_user2",
+            "password": "New@user123",
         }
         res = self.client.post(CREATE_USER_URL, payload)
         user = get_user_model().objects.get(
@@ -53,13 +57,7 @@ class PublicUserAPITests(TestCase):
 
     def test_user_exists(self):
         """Test creating user with an existing email fails"""
-        payload = {
-            "email": "test@example.com",
-            "username": "testuser1",
-            "password": "Test@user123",
-        }
-        create_user(**payload)
-        res = self.client.post(CREATE_USER_URL, payload)
+        res = self.client.post(CREATE_USER_URL, self.payload)
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         num_user = get_user_model().objects.all().count()
         self.assertEqual(num_user, 1)
@@ -67,25 +65,19 @@ class PublicUserAPITests(TestCase):
     def test_create_token_for_user(self):
         """Test create token for user successful"""
         payload = {
-            "email": "test@example.com",
-            "password": "Test@user123",
+            "email": self.payload["email"],
+            "password": self.payload["password"],
         }
-        create_user(**payload)
         res = self.client.post(TOKEN_URL, payload)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("token", res.data)
 
     def test_create_token_invalid_credentials(self):
         """Test create token with invalid credentials fails"""
-        payload = {
-            "email": "test@example.com",
-            "password": "Test@user123",
-        }
-        create_user(**payload)
         res = self.client.post(
             TOKEN_URL,
             {
-                "email": payload["email"],
+                "email": self.payload["email"],
                 "password": "WrongPassword",
             },
         )
@@ -95,7 +87,7 @@ class PublicUserAPITests(TestCase):
     def test_create_token_no_user(self):
         """Test that token is not created if user doesn't exist"""
         payload = {
-            "email": "test@example.com",
+            "email": "random@example.com",
             "password": "Test@user123",
         }
         res = self.client.post(TOKEN_URL, payload)
@@ -114,7 +106,7 @@ class PublicUserAPITests(TestCase):
 
     def test_reset_password_send_email_not_existed(self):
         """Test view should not send password reset link to an email not existed in database"""
-        payload = {"email": "test@example.com"}
+        payload = {"email": "random@example.com"}
         res = self.client.post(RESET_PASSWORD_URL, payload)
         ## should not respond with a 400 bad request because
         ## we don't want to reveal that a user with this email
@@ -124,8 +116,7 @@ class PublicUserAPITests(TestCase):
 
     def test_reset_password_send_email_existed(self):
         """Test sending an email to a user that exist in our database"""
-        payload = {"email": "test@example.com"}
-        create_user(**payload)
+        payload = {"email": self.payload["email"]}
         res = self.client.post(RESET_PASSWORD_URL, payload)
 
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -136,8 +127,7 @@ class PublicUserAPITests(TestCase):
     def test_reset_password_confirm_successful(self):
         """Test confirming rest password with valid uid and token successful"""
         ## creating a user and send a password reset email
-        payload = {"email": "test@example.com"}
-        user = create_user(**payload)
+        payload = {"email": self.payload["email"]}
         self.client.post(RESET_PASSWORD_URL, payload)
         ## get reset link from email body and split token and uid part
         reset_url = get_reset_password_url(mail.outbox[0].body)
@@ -152,8 +142,8 @@ class PublicUserAPITests(TestCase):
         }
         res = self.client.post(RESET_PASSWORD_CONFIRM_URL, payload)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        user.refresh_from_db()
-        self.assertTrue(user.check_password(payload["new_password1"]))
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(payload["new_password1"]))
 
     def test_reset_password_confirm_with_invalid_token_and_uid(self):
         """Test confirming rest password with invalid uid and token fails"""
