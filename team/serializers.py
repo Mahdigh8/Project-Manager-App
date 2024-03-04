@@ -35,7 +35,11 @@ class TeamMemberListSerializer(serializers.ListSerializer):
     def update(self, instance, validated_data):
         """Updating multiple members of the team"""
         member_mapping = {member.id: member for member in instance}
-        data_mapping = {item["id"]: item for item in validated_data}
+        data_mapping = {}
+        for item in validated_data:
+            if not item.get("id", None):
+                raise serializers.ValidationError("id field is missing")
+            data_mapping[item.get("id")] = item
 
         objs = []
         for member_id, data in data_mapping.items():
