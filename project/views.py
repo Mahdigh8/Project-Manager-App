@@ -4,8 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework import status
-from core.models import Project, Team, TeamMember
+from core.models import Project, TeamMember
 from .serializers import ProjectSerializer, ProjectListSerializer
+from .permission import IsAllowedToUpdateOrDelete
 
 
 class ProjectViewSet(ModelViewSet):
@@ -24,7 +25,13 @@ class ProjectViewSet(ModelViewSet):
         return self.queryset.filter(team__member__user=self.request.user)
 
     def check_team_admin(self, team_id):
-        """Checks if user is a team admin of the requested team_id"""
+        """
+        Checks if user is a team admin of the requested team_id
+        because we want to send an appropriate status code when
+        team_id is invalid or user is not a team admin we do this
+        check in view and not in the serializer despite the fact
+        that it is a data validation.
+        """
         ## Check if user is team member
         try:
             member = get_object_or_404(
@@ -43,7 +50,7 @@ class ProjectViewSet(ModelViewSet):
         return None
 
     def create(self, request, *args, **kwargs):
-        ## Checks for team_id
+        ## Checks for user to be a team admin of the requested team_id
         team_id = self.request.data.get("team_id", None)
         if not team_id:
             return Response(
@@ -53,3 +60,22 @@ class ProjectViewSet(ModelViewSet):
         if res:
             return res
         return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        """Checks for user to be a team admin of the requested team_id"""
+        team_id = self.request.data.get("team_id", None)
+        if team_id:
+            res = self.check_team_admin(team_id)
+            if res:
+                return res
+        return super().update(request, *args, **kwargs)
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        if self.action in ["update", "partial_update", "destroy"]:
+            permission_classes = [IsAuthenticated, IsAllowedToUpdateOrDelete]
+        else:
+            permission_classes = self.permission_classes
+        return [permission() for permission in permission_classes]
