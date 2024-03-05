@@ -10,4 +10,16 @@ app_name = "project"
 
 urlpatterns = [
     path("", include(router.urls)),
+    path(
+        "<int:pk>/task/",
+        ProjectViewSet.as_view({"get": "task_list", "post": "task_list"}),
+        name="task-list",
+    ),
+    path(
+        "<int:pk>/task/<int:task_id>/",
+        ProjectViewSet.as_view(
+            {"get": "task_detail", "patch": "task_detail", "delete": "task_detail"}
+        ),
+        name="task-detail",
+    ),
 ]
