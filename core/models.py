@@ -53,3 +53,35 @@ class Project(models.Model):
 
     def __str__(self):
         return f"{self.name}-{self.team.name}"
+
+
+class Task(models.Model):
+    PROJECT_STATUS_CHOICES = [
+        ("TODO", "To-Do"),
+        ("PROG", "In Progress"),
+        ("DONE", "Done"),
+    ]
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="tasks")
+    assigned_to = models.ForeignKey(
+        TeamMember, null=True, on_delete=models.SET_NULL, related_name="tasks"
+    )
+    created_by = models.ForeignKey(
+        TeamMember, on_delete=models.CASCADE, related_name="+"
+    )
+    due_date = models.DateTimeField(blank=True, null=True)
+    status = models.CharField(
+        max_length=4, choices=PROJECT_STATUS_CHOICES, default="TODO"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} -> {self.assigned_to.user.username}"
+
+
+class Comment(models.Model):
+    created_by = models.ForeignKey(TeamMember, null=True, on_delete=models.SET_NULL)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="comments")
+    body = models.TextField(blank=False)
+    created_at = models.DateTimeField(auto_now_add=True)
