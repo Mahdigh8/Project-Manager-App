@@ -84,3 +84,39 @@ class TestProjectModel(TestCase):
         self.assertEqual(project.description, "")
         self.assertEqual(project.team, payload["team"])
         self.assertEqual(project.deadline, payload["deadline"])
+
+
+class TestTaskModel(TestCase):
+    def test_create_task(self):
+        """Test creating a task"""
+        user1 = get_user_model().objects.create_user(
+            email="test1@example.com", username="TestUser1", password="TestPAss123"
+        )
+        user2 = get_user_model().objects.create_user(
+            email="test2@example.com", username="TestUser2", password="TestPAss123"
+        )
+        team_payload = {
+            "name": "Test team",
+            "public_edit": "ADMIN",
+        }
+        team = models.Team.objects.create(**team_payload)
+        member1 = models.TeamMember.objects.create(team=team, user=user1, is_admin=True)
+        member2 = models.TeamMember.objects.create(
+            team=team, user=user2, is_admin=False
+        )
+        project = models.Project.objects.create(name="Project 1", team=team)
+        payload = {
+            "title": "Task 1",
+            "project": project,
+            "assigned_to": member2,
+            "created_by": member1,
+            "due_date": time.strftime("%Y-%m-%d %H:%M:%S%z"),
+        }
+        task = models.Task.objects.create(**payload)
+        self.assertEqual(task.title, payload["title"])
+        self.assertEqual(task.description, "")
+        self.assertEqual(task.project, payload["project"])
+        self.assertEqual(task.assigned_to, payload["assigned_to"])
+        self.assertEqual(task.created_by, payload["created_by"])
+        self.assertEqual(task.due_date, payload["due_date"])
+        self.assertEqual(task.status, "TODO")
