@@ -3,9 +3,15 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from rest_framework import status
 from core.models import Project, TeamMember
-from .serializers import ProjectSerializer, ProjectListSerializer
+from .serializers import (
+    ProjectSerializer,
+    ProjectListSerializer,
+    TaskListSerializer,
+    TaskSerializer,
+)
 from .permission import IsAllowedToUpdateOrDelete
 
 
@@ -69,6 +75,39 @@ class ProjectViewSet(ModelViewSet):
             if res:
                 return res
         return super().update(request, *args, **kwargs)
+
+    @action(
+        detail=False,
+        methods=["get", "post"],
+        url_path="task",
+        serializer_class=TaskListSerializer,
+    )
+    def task_list(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "GET":
+            queryset = project.tasks.all().order_by("-created_at")
+            serializer = TaskListSerializer(
+                queryset, context={"request": request}, many=True
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["get", "patch", "delete"],
+        url_path="task/<int:task_id>",
+        serializer_class=TaskSerializer,
+    )
+    def task_detail(self, request, pk=None, task_id=None):
+        project = self.get_object()
+        try:
+            task = get_object_or_404(project.tasks, pk=task_id)
+        except:
+            return Response(
+                {"detail": "Task id not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        if request.method == "GET":
+            serializer = TaskSerializer(task)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
     def get_permissions(self):
         """
