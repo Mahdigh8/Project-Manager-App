@@ -77,7 +77,7 @@ class ProjectViewSet(ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     @action(
-        detail=False,
+        detail=True,
         methods=["get", "post"],
         url_path="task",
         serializer_class=TaskListSerializer,
@@ -90,6 +90,13 @@ class ProjectViewSet(ModelViewSet):
                 queryset, context={"request": request}, many=True
             )
             return Response(serializer.data, status=status.HTTP_200_OK)
+        elif request.method == "POST":
+            serializer = TaskSerializer(data=request.data, context={"request": request})
+            if serializer.is_valid():
+                serializer.save(project=project)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(
         detail=True,
