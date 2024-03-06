@@ -1,3 +1,4 @@
+import time
 from django.test import TestCase
 from rest_framework.test import APIClient
 from django.urls import reverse
@@ -99,5 +100,21 @@ class TaskAPITests(TestCase):
         res = self.client.get(task_detail_url(self.project.id, task.id))
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(task.title, res.data["title"])
-        self.assertIn("assigned_to", res.data)
+        self.assertIn("assignee", res.data)
         self.assertIn("created_by", res.data)
+
+    def test_create_task_in_project(self):
+        """Test creating task in project"""
+        payload = {
+            "title": "Task 1",
+            "assigned_to": self.member2.pk,
+            "due_date": time.strftime("%Y-%m-%d %H:%M:%S%z"),
+        }
+        res = self.client.post(task_url(self.project.id), payload)
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        tasks = Task.objects.all()
+        self.assertEqual(tasks.count(), 1)
+        self.assertEqual(tasks[0].assigned_to, self.member2)
+        self.assertEqual(tasks[0].created_by, self.member1)
+        self.assertEqual(tasks[0].project, self.project)
