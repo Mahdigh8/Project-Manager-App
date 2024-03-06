@@ -118,3 +118,79 @@ class TaskAPITests(TestCase):
         self.assertEqual(tasks[0].assigned_to, self.member2)
         self.assertEqual(tasks[0].created_by, self.member1)
         self.assertEqual(tasks[0].project, self.project)
+
+    def test_partial_update_task(self):
+        """Test updating task"""
+        payload = {
+            "title": "Task Title",
+            "project": self.project,
+            "assigned_to": self.member2,
+            "created_by": self.member1,
+        }
+        task = create_task(**payload)
+        user3 = create_user(username="testUser3", email="test3@example.com")
+        member3 = create_member(user=user3, team=self.team)
+        payload = {
+            "title": "Changed Title",
+            "description": "Some Description",
+            "assigned_to": member3.id,
+            "due_date": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "status": "DONE",
+        }
+        res = self.client.patch(task_detail_url(self.project.id, task.id), payload)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        task.refresh_from_db()
+        self.assertEqual(task.title, payload["title"])
+        self.assertEqual(task.description, payload["description"])
+        self.assertEqual(task.status, payload["status"])
+        self.assertEqual(task.assigned_to, member3)
+        self.assertEqual(
+            task.due_date.strftime("%Y-%m-%d %H:%M:%S"), payload["due_date"]
+        )
+
+    def test_partial_update_task_with_invalid_assigned_to(self):
+        """Test updating task with invalid assigned_to pk fails"""
+        payload = {
+            "title": "Task Title",
+            "project": self.project,
+            "assigned_to": self.member2,
+            "created_by": self.member1,
+        }
+        task = create_task(**payload)
+        payload = {
+            "assigned_to": 46,
+        }
+        res = self.client.patch(task_detail_url(self.project.id, task.id), payload)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        task.refresh_from_db()
+        self.assertNotEqual(task.assigned_to, payload["assigned_to"])
+
+    def test_partial_update_task_with_not_allowed_fields(self):
+        """Test updating not allowed fields of task object fails"""
+        payload = {
+            "title": "Task Title",
+            "project": self.project,
+            "assigned_to": self.member2,
+            "created_by": self.member1,
+        }
+        task = create_task(**payload)
+        payload = {
+            "created_by": self.member2,
+        }
+        res = self.client.patch(task_detail_url(self.project.id, task.id), payload)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        task.refresh_from_db()
+        self.assertNotEqual(task.created_by, payload["created_by"])
+
+    def test_delete_task(self):
+        """Test deleting task"""
+        payload = {
+            "title": "Task Title",
+            "project": self.project,
+            "assigned_to": self.member2,
+            "created_by": self.member1,
+        }
+        task = create_task(**payload)
+        res = self.client.delete(task_detail_url(self.project.id, task.id))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Task.objects.all().exists())
