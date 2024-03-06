@@ -46,8 +46,8 @@ class TeamMember(models.Model):
 
 class Project(models.Model):
     name = models.CharField(max_length=255)
-    description = models.TextField()
-    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    description = models.TextField(blank=True)
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="projects")
     deadline = models.DateField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -62,7 +62,7 @@ class Task(models.Model):
         ("DONE", "Done"),
     ]
     title = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(blank=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="tasks")
     assigned_to = models.ForeignKey(
         TeamMember, null=True, on_delete=models.SET_NULL, related_name="tasks"
