@@ -52,8 +52,11 @@ class TaskListSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     """Serializer for listing task objects"""
 
-    assigned_to = serializers.CharField(source="assigned_to.user.username")
-    created_by = serializers.CharField(source="created_by.user.username")
+    ## this field is for representation only
+    assignee = serializers.CharField(source="assigned_to.user.username", read_only=True)
+    created_by = serializers.CharField(
+        source="created_by.user.username", required=False
+    )
 
     class Meta:
         model = Task
@@ -62,8 +65,29 @@ class TaskSerializer(serializers.ModelSerializer):
             "title",
             "status",
             "assigned_to",
+            "assignee",
             "created_by",
             "created_at",
             "description",
             "due_date",
         ]
+        extra_kwargs = {"assigned_to": {"write_only": True}}
+
+    def _validate_assigned_to(self, project, assigned_to):
+        ## Check if assigned_to member is a member of the project team
+        if project.team.member.filter(pk=assigned_to.id).exists():
+            return True
+        return False
+
+    def create(self, validated_data):
+        project = validated_data.get("project", None)
+        assigned_to = validated_data.get("assigned_to", None)
+        if not self._validate_assigned_to(project, assigned_to):
+            raise serializers.ValidationError(
+                "assigned_to value not a member of this project"
+            )
+
+        request = self.context.get("request")
+        created_by = project.team.member.get(user=request.user)
+        validated_data["created_by"] = created_by
+        return super().create(validated_data)
