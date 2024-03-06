@@ -55,7 +55,7 @@ class TaskSerializer(serializers.ModelSerializer):
     ## this field is for representation only
     assignee = serializers.CharField(source="assigned_to.user.username", read_only=True)
     created_by = serializers.CharField(
-        source="created_by.user.username", required=False
+        source="created_by.user.username", read_only=True
     )
 
     class Meta:
@@ -71,23 +71,30 @@ class TaskSerializer(serializers.ModelSerializer):
             "description",
             "due_date",
         ]
-        extra_kwargs = {"assigned_to": {"write_only": True}}
+        extra_kwargs = {
+            "assigned_to": {"write_only": True, "required": True},
+        }
 
-    def _validate_assigned_to(self, project, assigned_to):
+    def _validate_assigned_to(self, validated_data):
         ## Check if assigned_to member is a member of the project team
-        if project.team.member.filter(pk=assigned_to.id).exists():
-            return True
-        return False
-
-    def create(self, validated_data):
         project = validated_data.get("project", None)
         assigned_to = validated_data.get("assigned_to", None)
-        if not self._validate_assigned_to(project, assigned_to):
+        if not project.team.member.filter(pk=assigned_to.id).exists():
             raise serializers.ValidationError(
-                "assigned_to value not a member of this project"
+                "assigned_to id is not a member of this project"
             )
 
+    def create(self, validated_data):
+        self._validate_assigned_to(validated_data)
+        project = validated_data.get("project", None)
         request = self.context.get("request")
         created_by = project.team.member.get(user=request.user)
         validated_data["created_by"] = created_by
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        assigned_to = validated_data.get("assigned_to", None)
+        if assigned_to:
+            self._validate_assigned_to(validated_data)
+        validated_data.pop("project", None)
+        return super().update(instance, validated_data)

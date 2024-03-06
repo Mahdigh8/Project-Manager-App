@@ -112,9 +112,22 @@ class ProjectViewSet(ModelViewSet):
             return Response(
                 {"detail": "Task id not found."}, status=status.HTTP_404_NOT_FOUND
             )
+
         if request.method == "GET":
             serializer = TaskSerializer(task)
             return Response(serializer.data, status=status.HTTP_200_OK)
+
+        elif request.method == "PATCH":
+            serializer = TaskSerializer(task, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save(project=project)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        elif request.method == "DELETE":
+            task.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_permissions(self):
         """
